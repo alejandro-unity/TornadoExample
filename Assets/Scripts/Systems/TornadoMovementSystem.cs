@@ -18,7 +18,10 @@ partial struct TornadoMovementSystem : ISystem
     {
         float deltaTime = SystemAPI.Time.DeltaTime;
         
-        foreach (var (transform, movement) in SystemAPI.Query<RefRW<LocalTransform>, RefRW<TornadoMovementData>>())
+        // create a Command buffer for Destroy the entity 
+        var ecb = new EntityCommandBuffer(Allocator.TempJob);
+        //adding with WithEntityAccess to get the entity from the query 
+        foreach (var (transform, movement, entity) in SystemAPI.Query<RefRW<LocalTransform>, RefRW<TornadoMovementData>>().WithEntityAccess())
         {
             movement.ValueRW.angle  += movement.ValueRO.speed * deltaTime;
             movement.ValueRW.height += movement.ValueRO.heightSpeed * deltaTime;
@@ -28,9 +31,18 @@ partial struct TornadoMovementSystem : ISystem
             var y = movement.ValueRO.height;
             
             float3 newPosition = new float3(x, y, z);
+            
             transform.ValueRW.Position = newPosition;
+
+            if (transform.ValueRW.Position.y > 50)
+            {
+                ecb.DestroyEntity(entity);
+            }
         }
         
+        ecb.Playback(state.EntityManager);
+        // You are responsible for disposing of any ECB you create.
+        ecb.Dispose();
         
     }
 
